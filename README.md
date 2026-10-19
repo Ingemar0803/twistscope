@@ -4,7 +4,7 @@
 
 Twisting one atom-thin layer against another changes how a material conducts electricity and emits light. At 1.1°, twisted bilayer graphene becomes a superconductor. TwistScope measures that twist angle automatically, and it also tells you how sure it is.
 
-**Try it in your browser:** https://YOUR-USERNAME.github.io/twistscope/ (no installation needed)
+**Try it in your browser:** https://ingemar0803.github.io/twistscope/ (no installation needed)
 
 ![Simulated diffraction of twisted bilayers, showing first-order spots and moiré spots](figures/moire_with_first_order.png)
 
