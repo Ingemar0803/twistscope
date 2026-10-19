@@ -1,0 +1,732 @@
+<title>TwistScope</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: an instrument panel. Controls on the left, two detector screens on the right, readouts below. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --surface-2:#f6f8fb; --ink:#141a22; --ink-2:#4b5563; --line:#d3d9e2;
+  --accent:#1d5fc2; --accent-ink:#ffffff; --l1:#2a6fd0; --l2:#d4561f; --moire:#c8322f; --good:#17794a; --warn:#9a5b00;
+  --screen:#05070b;
+  --f-display:'IBM Plex Sans Condensed','Arial Narrow',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1117; --surface:#161c25; --surface-2:#1b222d; --ink:#e7ecf3; --ink-2:#a3adbb; --line:#2b3340;
+  --accent:#6aa5ff; --accent-ink:#081120; --l1:#5b9cf0; --l2:#f08a52; --moire:#ff6b66; --good:#4cc38a; --warn:#e5a84d; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0d1117; --surface:#161c25; --surface-2:#1b222d; --ink:#e7ecf3; --ink-2:#a3adbb; --line:#2b3340;
+  --accent:#6aa5ff; --accent-ink:#081120; --l1:#5b9cf0; --l2:#f08a52; --moire:#ff6b66; --good:#4cc38a; --warn:#e5a84d; color-scheme:dark; }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:15px; line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:20px 40px}
+.wrap{max-width:1240px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
+header{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px 24px}
+.brand{display:flex; flex-direction:column; gap:2px}
+.brand h1{font-family:var(--f-display); font-weight:700; font-size:34px; letter-spacing:.01em; margin:0; line-height:1.05}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:0; color:var(--ink-2); max-width:62ch}
+.tabs{display:flex; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:4px}
+.tab{font:600 14px var(--f-body); border:0; background:transparent; color:var(--ink-2); padding:9px 16px; border-radius:7px; cursor:pointer; min-height:40px}
+.tab[aria-selected="true"]{background:var(--accent); color:var(--accent-ink)}
+.tab:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.panel{display:grid; grid-template-columns:minmax(0,300px) minmax(0,1fr); gap:18px; align-items:start}
+@media (max-width:860px){ .panel{grid-template-columns:minmax(0,1fr)} }
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px; min-width:0}
+.controls{display:flex; flex-direction:column; gap:16px}
+.ctl{display:flex; flex-direction:column; gap:6px}
+.ctl label, .lbl{font:600 12px var(--f-body); letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2)}
+.row{display:flex; gap:10px; align-items:center}
+.row > *{min-width:0}
+select, input[type="number"], input[type="text"]{font:15px var(--f-body); color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-height:40px; width:100%}
+input[type="number"]{font-family:var(--f-mono); width:96px; flex:none}
+input[type="range"]{width:100%; accent-color:var(--accent)}
+.val{font-family:var(--f-mono); font-size:14px; color:var(--ink); min-width:56px; text-align:right}
+.hint{font-size:13px; color:var(--ink-2); margin:0}
+.check{display:flex; gap:8px; align-items:center; font-size:14px}
+.check input{width:18px; height:18px; accent-color:var(--accent)}
+.btn{font:600 14px var(--f-body); border-radius:8px; padding:9px 14px; min-height:42px; cursor:pointer; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink)}
+.btn.ghost{background:transparent; color:var(--accent)}
+.btns{display:flex; flex-wrap:wrap; gap:8px}
+.screens{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px}
+@media (max-width:640px){ .screens{grid-template-columns:minmax(0,1fr)} }
+figure{margin:0; display:flex; flex-direction:column; gap:8px; min-width:0}
+figcaption{display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 12px; align-items:baseline}
+figcaption b{font-family:var(--f-display); font-weight:600; font-size:17px}
+.screen{position:relative; width:100%; aspect-ratio:1/1; max-width:100%; background:var(--screen); border-radius:8px; overflow:hidden}
+.screen canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:auto}
+.legend{display:flex; flex-wrap:wrap; gap:10px; font-size:12.5px; color:var(--ink-2)}
+.legend i{display:inline-block; width:10px; height:10px; border-radius:50%; border:2px solid currentColor; margin-right:5px; vertical-align:-1px}
+.k1{color:var(--l1)} .k2{color:var(--l2)} .km{color:var(--moire)}
+.readouts{display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:10px 18px; margin:0}
+.readouts div{display:flex; flex-direction:column; gap:1px; padding-top:8px; border-top:1px solid var(--line)}
+.readouts dt{font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-2)}
+.readouts dd{margin:0; font-family:var(--f-mono); font-size:16px; font-variant-numeric:tabular-nums}
+.drop{border:1.5px dashed var(--line); border-radius:10px; padding:14px; text-align:center; color:var(--ink-2); font-size:14px; background:var(--surface-2)}
+.drop.over{border-color:var(--accent); color:var(--ink)}
+.drop input{display:block; margin:8px auto 0; max-width:100%}
+fieldset{border:0; padding:0; margin:0; display:flex; flex-direction:column; gap:6px}
+legend{padding:0; margin-bottom:4px}
+.radio{display:flex; gap:8px; align-items:flex-start; font-size:14px}
+.radio input{margin-top:3px; accent-color:var(--accent)}
+.result{display:flex; flex-direction:column; gap:12px}
+.big{display:flex; flex-wrap:wrap; gap:6px 22px; align-items:baseline}
+.big .num{font-family:var(--f-display); font-weight:700; font-size:44px; line-height:1}
+.big .unc{font-family:var(--f-mono); color:var(--ink-2)}
+.pill{display:inline-block; font:600 12px var(--f-body); letter-spacing:.04em; padding:3px 9px; border-radius:999px; border:1px solid currentColor}
+.pill.good{color:var(--good)} .pill.warn{color:var(--warn)}
+.notes{margin:0; padding-left:18px; color:var(--ink-2); font-size:14px; display:flex; flex-direction:column; gap:4px}
+.foot{color:var(--ink-2); font-size:13px; max-width:90ch}
+.foot p{margin:0 0 6px}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Twist<span>Scope</span></h1>
+      <p>Simulate the electron-diffraction pattern of a twisted 2D bilayer, or measure the twist angle and the likely material from an image.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Mode">
+      <button class="tab" role="tab" id="tabSim" aria-selected="true" aria-controls="pSim">Simulate</button>
+      <button class="tab" role="tab" id="tabMeas" aria-selected="false" aria-controls="pMeas">Measure from an image</button>
+    </div>
+  </header>
+
+  <!-- ================= SIMULATE ================= -->
+  <section id="pSim" role="tabpanel" aria-labelledby="tabSim" class="panel">
+    <div class="card controls">
+      <div class="ctl"><label for="m1">Bottom layer</label><select id="m1"></select></div>
+      <div class="ctl"><label for="m2">Top layer</label><select id="m2"></select></div>
+      <div class="ctl">
+        <label for="th">Twist angle</label>
+        <div class="row"><input type="range" id="th" min="0" max="60" step="0.1" value="6"><input type="number" id="thn" min="0" max="60" step="0.1" value="6" aria-label="Twist angle in degrees"></div>
+        <p class="hint">Degrees. Patterns repeat every 60°, and θ looks the same as 60° − θ.</p>
+      </div>
+      <div class="ctl">
+        <label for="al">Double scattering <span style="text-transform:none">(α)</span></label>
+        <div class="row"><input type="range" id="al" min="0" max="3" step="0.05" value="0.25"><span class="val" id="alv">0.25</span></div>
+        <p class="hint">Model knob for electrons scattering off both layers. It creates the moiré spots near the centre. Its strength is not a measured constant.</p>
+      </div>
+      <div class="ctl"><label for="sg">Spot size</label><div class="row"><input type="range" id="sg" min="1" max="6" step="0.5" value="2.5"><span class="val" id="sgv">2.5 px</span></div></div>
+      <div class="ctl"><label for="dy">Contrast</label><div class="row"><input type="range" id="dy" min="2" max="8" step="0.5" value="5"><span class="val" id="dyv">10⁵</span></div><p class="hint">Brightness range shown, like a detector's exposure.</p></div>
+      <label class="check"><input type="checkbox" id="mk" checked> Mark spots by layer</label>
+      <div class="btns">
+        <button class="btn" id="sendDiff">Measure this pattern</button>
+        <button class="btn ghost" id="sendReal">Measure the moiré image</button>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex; flex-direction:column; gap:16px">
+      <div class="screens">
+        <figure>
+          <figcaption><b>Diffraction pattern</b><span class="legend"><span class="k1"><i></i>Bottom layer</span><span class="k2"><i></i>Top layer</span><span class="km"><i></i>Moiré</span></span></figcaption>
+          <div class="screen"><canvas id="cDiff" width="512" height="512" role="img" aria-label="Simulated electron diffraction pattern"></canvas><canvas id="oDiff" width="512" height="512" aria-hidden="true"></canvas></div>
+          <p class="hint" id="diffScale"></p>
+        </figure>
+        <figure>
+          <figcaption><b>Real space</b><span class="hint">Both layers overlaid, as a microscope sees them</span></figcaption>
+          <div class="screen"><canvas id="cReal" width="512" height="512" role="img" aria-label="Simulated real-space image of the twisted bilayer showing the moiré pattern"></canvas></div>
+          <p class="hint" id="realScale"></p>
+        </figure>
+      </div>
+      <dl class="readouts" id="simOut"></dl>
+    </div>
+  </section>
+
+  <!-- ================= MEASURE ================= -->
+  <section id="pMeas" role="tabpanel" aria-labelledby="tabMeas" class="panel" hidden>
+    <div class="card controls">
+      <div class="drop" id="drop">
+        <label for="file" class="lbl">Upload an image</label>
+        <div>Drop a PNG or JPG here, or choose a file.</div>
+        <input type="file" id="file" accept="image/*">
+      </div>
+      <fieldset>
+        <legend class="lbl">What is the image?</legend>
+        <label class="radio"><input type="radio" name="itype" id="tReal" value="real" checked><span>Real-space image (STM, AFM or TEM) showing atoms or the moiré</span></label>
+        <label class="radio"><input type="radio" name="itype" id="tDiff" value="diff"><span>Electron diffraction pattern</span></label>
+      </fieldset>
+      <div class="ctl" id="wrapW"><label for="wnm">Image width (nm)</label><input type="number" id="wnm" min="0" step="any" placeholder="optional" style="width:100%"><p class="hint">Needed to identify the material and to use a moiré-only image.</p></div>
+      <div class="ctl" id="wrapC" hidden><label for="cal">Scale (1/nm per pixel)</label><input type="number" id="cal" min="0" step="any" placeholder="optional" style="width:100%"><p class="hint">Camera calibration of the original image. Needed to identify the material.</p></div>
+      <div class="ctl" id="wrapS" hidden><label class="check"><input type="checkbox" id="st"> Correct image stretch</label><p class="hint">Turn on for figures copied from papers, which are often resized unevenly. Leave off for raw microscope images.</p></div>
+      <div class="ctl"><label for="hint">Material</label><select id="hint"></select><p class="hint">Used when only the moiré is visible.</p></div>
+      <button class="btn" id="run">Measure</button>
+      <div class="ctl"><span class="lbl">Examples</span>
+        <div class="btns"><button class="btn ghost" id="exR">STM-like, graphene 8°</button><button class="btn ghost" id="exD">Diffraction, MoS₂ 16°</button></div>
+        <p class="hint">Generated by the simulator with noise added, so the true answer is known.</p>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex; flex-direction:column; gap:16px">
+      <div class="screens">
+        <figure><figcaption><b>Input</b><span class="hint" id="inNote">Centre square, resampled to 512 × 512</span></figcaption>
+          <div class="screen"><canvas id="cIn" width="512" height="512" role="img" aria-label="Image being measured"></canvas><canvas id="oIn" width="512" height="512" aria-hidden="true"></canvas></div></figure>
+        <figure id="figFft"><figcaption><b>Fourier transform</b><span class="legend"><span class="k1"><i></i>Lattice 1</span><span class="k2"><i></i>Lattice 2</span><span class="km"><i></i>Moiré</span></span></figcaption>
+          <div class="screen"><canvas id="cFft" width="512" height="512" role="img" aria-label="Fourier transform of the image, a computed diffraction pattern"></canvas><canvas id="oFft" width="512" height="512" aria-hidden="true"></canvas></div></figure>
+      </div>
+      <div class="result" id="res" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <p><b>How it works.</b> The simulator uses kinematic (single-scattering) diffraction theory: each layer's crystal lattice gives a hexagon of spots, and the twist rotates one hexagon against the other. The analyser finds the spots, folds their directions modulo 60°, splits them into two layers and reports the angle between them. A real-space image is first Fourier-transformed, which turns it into a computed diffraction pattern.</p>
+    <p><b>Limits.</b> Spot brightness from double scattering (α) is a model setting, not physics fitted to data. Angles below about 2° are unreliable from spot directions alone. Materials whose lattice constants differ by under about 2% (MoS₂ and WS₂, graphene and hBN) cannot be told apart from spacing alone. Lattice constants are typical literature values.</p>
+  </div>
+</div>
+
+<script>
+// ==CORE START==
+const MATERIALS = {
+  graphene:{name:"Graphene", a:2.46, basis:[[0,0,6],[1/3,1/3,6]]},
+  hBN:{name:"hBN", a:2.50, basis:[[0,0,5],[1/3,1/3,7]]},
+  MoS2:{name:"MoS₂", a:3.16, basis:[[0,0,42],[1/3,1/3,32]]},
+  WS2:{name:"WS₂", a:3.15, basis:[[0,0,74],[1/3,1/3,32]]},
+  MoSe2:{name:"MoSe₂", a:3.29, basis:[[0,0,42],[1/3,1/3,68]]},
+  WSe2:{name:"WSe₂", a:3.28, basis:[[0,0,74],[1/3,1/3,68]]}
+};
+const SIG_ATOM = 0.35;                 // atomic smearing (Å) -> falling spot brightness at large q
+const DEG = Math.PI/180;
+const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+const Gfirst = key => 4*Math.PI/(Math.sqrt(3)*MATERIALS[key].a);
+
+function recip(a, phiDeg){
+  const p = phiDeg*DEG, c = Math.cos(p), s = Math.sin(p), k = 2*Math.PI/a;
+  const rot = v => [c*v[0]-s*v[1], s*v[0]+c*v[1]];
+  return [rot([k, -k/Math.sqrt(3)]), rot([0, 2*k/Math.sqrt(3)])];
+}
+
+function layerSpots(key, phiDeg, qmax, layer){
+  const m = MATERIALS[key], [b1,b2] = recip(m.a, phiDeg);
+  const n = Math.ceil(qmax/Math.hypot(b1[0],b1[1])*1.3)+1, out = [];
+  for(let h=-n; h<=n; h++) for(let k=-n; k<=n; k++){
+    if(!h && !k) continue;
+    const x = h*b1[0]+k*b2[0], y = h*b1[1]+k*b2[1], q = Math.hypot(x,y);
+    if(q > qmax) continue;
+    let re = 0, im = 0;
+    for(const [fx,fy,w] of m.basis){ const ph = 2*Math.PI*(h*fx+k*fy); re += w*Math.cos(ph); im += w*Math.sin(ph); }
+    const dw = Math.exp(-SIG_ATOM*SIG_ATOM*q*q/2);
+    out.push({x, y, q, re:re*dw, im:im*dw, layer, h, k});
+  }
+  return out;
+}
+
+function simulate(k1, k2, theta, alpha, qmax){
+  const L1 = layerSpots(k1, 0, qmax, 1), L2 = layerSpots(k2, theta, qmax, 2);
+  const map = new Map();
+  const key = (x,y) => Math.round(x*1e5)+","+Math.round(y*1e5);
+  const add = s => { const kk = key(s.x,s.y), e = map.get(kk);
+    if(e){ e.re += s.re; e.im += s.im; if(e.layer !== s.layer && s.layer !== 3) e.layer = e.layer===3 ? s.layer : 12; }
+    else map.set(kk, {...s}); };
+  L1.forEach(add); L2.forEach(add);
+  const F0 = [k1,k2].reduce((t,k)=>t+MATERIALS[k].basis.reduce((u,b)=>u+b[2],0),0);
+  map.set(key(0,0), {x:0,y:0,q:0,re:F0,im:0,layer:0});
+  if(alpha > 0){
+    const g1 = Gfirst(k1), g2 = Gfirst(k2);
+    const A = L1.filter(s=>s.q < 1.9*g1), B = L2.filter(s=>s.q < 1.9*g2);
+    const Fref = Math.max(...L1.filter(s=>s.q < 1.1*g1).map(s=>Math.hypot(s.re,s.im)));
+    const c = 0.04*alpha/Fref;
+    for(const a of A) for(const b of B){
+      const x = a.x+b.x, y = a.y+b.y, q = Math.hypot(x,y);
+      if(q > qmax || q < 1e-6) continue;
+      add({x, y, q, re:c*(a.re*b.re - a.im*b.im), im:c*(a.re*b.im + a.im*b.re), layer:3});
+    }
+  }
+  return [...map.values()].map(s => ({...s, I: s.re*s.re + s.im*s.im}));
+}
+
+function moirePeriod(k1, k2, theta){
+  const a1 = MATERIALS[k1].a, d = MATERIALS[k2].a/a1 - 1, t = theta*DEG;
+  const den = Math.sqrt(2*(1+d)*(1-Math.cos(t)) + d*d);
+  return den < 1e-9 ? Infinity : (1+d)*a1/den;
+}
+
+function renderDiffraction(spots, N, qmax, sig, dyn){
+  const buf = new Float32Array(N*N), sc = (N/2)/qmax;
+  let Imax = 0; for(const s of spots) if(s.layer !== 0 && s.I > Imax) Imax = s.I;
+  const R = Math.ceil(3*sig);
+  for(const s of spots){
+    const cx = N/2 + s.x*sc, cy = N/2 - s.y*sc, I = s.layer === 0 ? Imax*50 : s.I;
+    const x0 = Math.max(0, Math.floor(cx-R)), x1 = Math.min(N-1, Math.ceil(cx+R));
+    const y0 = Math.max(0, Math.floor(cy-R)), y1 = Math.min(N-1, Math.ceil(cy+R));
+    for(let y=y0; y<=y1; y++) for(let x=x0; x<=x1; x++){
+      const d2 = (x-cx)*(x-cx) + (y-cy)*(y-cy);
+      buf[y*N+x] += I*Math.exp(-d2/(2*sig*sig));
+    }
+  }
+  const out = new Float32Array(N*N);
+  for(let i=0; i<N*N; i++){ const v = (Math.log10(buf[i]/Imax + 1e-14) + dyn)/dyn; out[i] = v < 0 ? 0 : v > 1 ? 1 : v; }
+  return {img:out, sc};
+}
+
+function firstOrderVectors(key, phiDeg){
+  const [b1,b2] = recip(MATERIALS[key].a, phiDeg);
+  const v = [b1, b2, [b1[0]+b2[0], b1[1]+b2[1]]];
+  return v.concat(v.map(g=>[-g[0],-g[1]]));
+}
+
+// Real-space contrast: each layer is a sum of its six first-order waves; the square models the
+// non-linear contrast of a microscope, which is what makes the moiré show up as its own period.
+function renderRealSpace(k1, k2, theta, N, W){
+  const s = W/N, G = firstOrderVectors(k1,0).concat(firstOrderVectors(k2,theta));
+  const out = new Float32Array(N*N); let mn = Infinity, mx = -Infinity;
+  for(let j=0; j<N; j++){ const y = (N/2 - j)*s;
+    for(let i=0; i<N; i++){ const x = (i - N/2)*s; let r = 0;
+      for(let g=0; g<12; g++) r += Math.cos(G[g][0]*x + G[g][1]*y);
+      const v = (r/6 + 1)**2; out[j*N+i] = v; if(v<mn) mn=v; if(v>mx) mx=v; } }
+  for(let i=0; i<N*N; i++) out[i] = (out[i]-mn)/(mx-mn);
+  return out;
+}
+
+function fft1(re, im, n){
+  for(let i=1, j=0; i<n; i++){ let bit = n>>1; for(; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if(i < j){ let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for(let len=2; len<=n; len<<=1){ const ang = -2*Math.PI/len, wr = Math.cos(ang), wi = Math.sin(ang), h = len>>1;
+    for(let i=0; i<n; i+=len){ let cr = 1, ci = 0;
+      for(let j=0; j<h; j++){ const a = i+j, b = a+h;
+        const br = re[b]*cr - im[b]*ci, bi = re[b]*ci + im[b]*cr;
+        re[b] = re[a]-br; im[b] = im[a]-bi; re[a] += br; im[a] += bi;
+        const t = cr*wr - ci*wi; ci = cr*wi + ci*wr; cr = t; } } }
+}
+function fft2(re, im, N){
+  const r = new Float64Array(N), m = new Float64Array(N);
+  for(let y=0; y<N; y++){ for(let x=0; x<N; x++){ r[x] = re[y*N+x]; m[x] = im[y*N+x]; } fft1(r,m,N); for(let x=0; x<N; x++){ re[y*N+x] = r[x]; im[y*N+x] = m[x]; } }
+  for(let x=0; x<N; x++){ for(let y=0; y<N; y++){ r[y] = re[y*N+x]; m[y] = im[y*N+x]; } fft1(r,m,N); for(let y=0; y<N; y++){ re[y*N+x] = r[y]; im[y*N+x] = m[y]; } }
+}
+
+function gaussBlur(src, N, sigma){
+  const R = Math.max(1, Math.ceil(3*sigma)), k = []; let s = 0;
+  for(let i=-R; i<=R; i++){ const v = Math.exp(-i*i/(2*sigma*sigma)); k.push(v); s += v; }
+  for(let i=0; i<k.length; i++) k[i] /= s;
+  const tmp = new Float32Array(N*N), out = new Float32Array(N*N);
+  for(let y=0; y<N; y++) for(let x=0; x<N; x++){ let a = 0;
+    for(let i=-R; i<=R; i++){ const xx = x+i < 0 ? 0 : x+i >= N ? N-1 : x+i; a += k[i+R]*src[y*N+xx]; } tmp[y*N+x] = a; }
+  for(let y=0; y<N; y++) for(let x=0; x<N; x++){ let a = 0;
+    for(let i=-R; i<=R; i++){ const yy = y+i < 0 ? 0 : y+i >= N ? N-1 : y+i; a += k[i+R]*tmp[yy*N+x]; } out[y*N+x] = a; }
+  return out;
+}
+
+function median(arr){ const a = Float32Array.from(arr).sort(); return a.length ? a[a.length>>1] : 0; }
+function robustStats(vals){ const med = median(vals); const dev = vals.map(v=>Math.abs(v-med)); return {med, mad: 1.4826*median(dev) + 1e-9}; }
+
+function findMaxima(img, N, {win=3, thr=-Infinity, border=6, rmin=0, rmax=Infinity, cx=N/2, cy=N/2, exclude=null, maxN=80}){
+  const pts = [];
+  for(let y=border; y<N-border; y++) for(let x=border; x<N-border; x++){
+    const v = img[y*N+x]; if(v <= thr) continue;
+    if(exclude && exclude[y*N+x]) continue;
+    const r = Math.hypot(x-cx, y-cy); if(r < rmin || r > rmax) continue;
+    let ok = true;
+    for(let dy=-win; dy<=win && ok; dy++) for(let dx=-win; dx<=win; dx++){
+      const yy = y+dy, xx = x+dx; if(yy<0||yy>=N||xx<0||xx>=N) continue;
+      if(img[yy*N+xx] > v){ ok = false; break; } }
+    if(ok) pts.push({x, y, v});
+  }
+  pts.sort((a,b)=>b.v-a.v);
+  // refine to sub-pixel by a weighted centroid
+  return pts.slice(0, maxN).map(p => { let sw = 0, sx = 0, sy = 0;
+    for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++){ const xx = p.x+dx, yy = p.y+dy;
+      const w = Math.max(0, img[yy*N+xx] - thr); sw += w; sx += w*xx; sy += w*yy; }
+    return sw > 0 ? {x:sx/sw, y:sy/sw, v:p.v} : p; });
+}
+
+function splitRings(r, idx, gap, absGap=0){
+  const order = idx.slice().sort((a,b)=>r[a]-r[b]); if(!order.length) return [];
+  const rings = [[order[0]]];
+  for(let i=1; i<order.length; i++){
+    const d = r[order[i]] - r[order[i-1]]; if(d/r[order[i-1]] > gap && d > absGap) rings.push([]);
+    rings[rings.length-1].push(order[i]); }
+  return rings;
+}
+
+function sixfold(phi){ let c = 0, s = 0; for(const p of phi){ c += Math.cos(6*p); s += Math.sin(6*p); } return Math.hypot(c,s)/phi.length; }
+
+function twoGroups(phi){
+  const psi = phi.map(p=>wrap(6*p)), n = psi.length;
+  let i0 = 0, j0 = 1, dmax = -1;
+  for(let i=0; i<n; i++) for(let j=i+1; j<n; j++){ const d = Math.abs(wrap(psi[i]-psi[j])); if(d > dmax){ dmax = d; i0 = i; j0 = j; } }
+  let c = [psi[i0], psi[j0]], lab = new Array(n).fill(0);
+  for(let it=0; it<50; it++){
+    lab = psi.map(p => Math.abs(wrap(p-c[0])) <= Math.abs(wrap(p-c[1])) ? 0 : 1);
+    const nc = [0,1].map(g => { let cs = 0, sn = 0, m = 0; psi.forEach((p,i)=>{ if(lab[i]===g){ cs += Math.cos(p); sn += Math.sin(p); m++; } }); return m ? Math.atan2(sn,cs) : c[g]; });
+    if(Math.abs(wrap(nc[0]-c[0])) < 1e-12 && Math.abs(wrap(nc[1]-c[1])) < 1e-12) break; c = nc; }
+  const theta = Math.abs(wrap(c[0]-c[1]))/6/DEG;
+  let se2 = 0; const counts = [0,0];
+  for(const g of [0,1]){ const dev = []; psi.forEach((p,i)=>{ if(lab[i]===g) dev.push(wrap(p-c[g])/6/DEG); });
+    counts[g] = dev.length;
+    if(dev.length > 1){ const mu = dev.reduce((a,b)=>a+b,0)/dev.length; const v = dev.reduce((a,b)=>a+(b-mu)**2,0)/(dev.length-1); se2 += v/dev.length; } }
+  let ss = 0, dof = 0;
+  for(const g of [0,1]){ const dev = []; psi.forEach((p,i)=>{ if(lab[i]===g) dev.push(wrap(p-c[g])/6/DEG); });
+    if(dev.length > 1){ const mu = dev.reduce((a,b)=>a+b,0)/dev.length; ss += dev.reduce((a,b)=>a+(b-mu)**2,0); dof += dev.length-1; } }
+  return {theta, labels:lab, se:Math.sqrt(se2), counts, centres:c, sd: dof ? Math.sqrt(ss/dof) : 0};
+}
+
+function centreFromPairs(pts, tol=3, minSep=30, N=512){
+  // Opposite (Friedel) spots g and -g have equal brightness and share the hidden centre as midpoint.
+  const mids = [];
+  for(let i=0; i<pts.length; i++) for(let j=i+1; j<pts.length; j++){
+    const vi = pts[i].v, vj = pts[j].v;
+    if(vi !== undefined && vj !== undefined && Math.min(vi,vj)/Math.max(vi,vj) < 0.4) continue;
+    if(Math.hypot(pts[i].x-pts[j].x, pts[i].y-pts[j].y) > minSep) mids.push([(pts[i].x+pts[j].x)/2, (pts[i].y+pts[j].y)/2]); }
+  let best = -1, bs = -Infinity, bc = 0;
+  for(let i=0; i<mids.length; i++){ let c = 0;
+    for(let j=0; j<mids.length; j++) if(Math.hypot(mids[i][0]-mids[j][0], mids[i][1]-mids[j][1]) < tol) c++;
+    const score = c - 0.9*Math.hypot(mids[i][0]-N/2, mids[i][1]-N/2)/(N/2);   // ties go to the more central candidate
+    if(score > bs){ bs = score; bc = c; best = i; } }
+  if(best < 0) return {cx:NaN, cy:NaN, count:0};
+  let sx = 0, sy = 0, m = 0;
+  for(const p of mids) if(Math.hypot(p[0]-mids[best][0], p[1]-mids[best][1]) < tol){ sx += p[0]; sy += p[1]; m++; }
+  return {cx:sx/m, cy:sy/m, count:m};
+}
+
+function centreCandidates(pts, N, tol=3, minSep=30, maxC=8){
+  const mids = [];
+  for(let i=0; i<pts.length; i++) for(let j=i+1; j<pts.length; j++){
+    const vi = pts[i].v, vj = pts[j].v;
+    if(vi !== undefined && vj !== undefined && Math.min(vi,vj)/Math.max(vi,vj) < 0.4) continue;
+    if(Math.hypot(pts[i].x-pts[j].x, pts[i].y-pts[j].y) > minSep) mids.push([(pts[i].x+pts[j].x)/2, (pts[i].y+pts[j].y)/2]); }
+  const cl = mids.map(m => { let c = 0, sx = 0, sy = 0; for(const q of mids) if(Math.hypot(m[0]-q[0], m[1]-q[1]) < tol){ c++; sx += q[0]; sy += q[1]; } return {cx:sx/c, cy:sy/c, count:c}; })
+    .sort((a,b)=>b.count-a.count);
+  const out = [];
+  for(const c of cl){ if(c.count < 2) break; if(out.every(o => Math.hypot(o.cx-c.cx, o.cy-c.cy) > 5)) out.push(c); if(out.length >= maxC) break; }
+  return out;
+}
+// The true centre puts 6 or 12 spots on one ring; false 'half-lattice' centres only pair spots two by two.
+function pickCentre(pts, N){
+  const cands = centreCandidates(pts, N);
+  let best = null;
+  for(const c of cands){
+    const dx = pts.map(p=>p.x-c.cx), dy = pts.map(p=>-(p.y-c.cy));
+    const f = fitStretch(dx, dy);
+    const tie = f.score + 0.01*c.count - 0.001*Math.hypot(c.cx-N/2, c.cy-N/2);
+    if(!best || tie > best.tie) best = {cx:c.cx, cy:c.cy, count:c.count, tie};
+  }
+  return best || {cx:NaN, cy:NaN, count:0};
+}
+function ringScore(dx, dy, k, rmin){
+  const r = dx.map((x,i)=>Math.hypot(x/k, dy[i])); const idx = r.map((_,i)=>i).filter(i=>r[i] > rmin);
+  let score = 0, sc = 0, nr = 0;
+  for(const g of splitRings(r, idx, 0.03)) if(g.length >= 5){ score += g.length;
+    const m = g.reduce((a,i)=>a+r[i],0)/g.length; sc += Math.sqrt(g.reduce((a,i)=>a+(r[i]-m)**2,0)/g.length)/m; nr++; }
+  return {score, sc: nr ? sc/nr : Infinity};
+}
+// Horizontal stretch k that puts the most spots on tight rings (k = 1: no stretch).
+function fitStretch(dx, dy, rmin=15){
+  const at1 = ringScore(dx, dy, 1, rmin);
+  let best = {k:1, score:at1.score, sc:at1.sc};
+  for(let k=0.7; k<=1.4001; k+=0.002){ const q = ringScore(dx, dy, k, rmin);
+    if(q.score > best.score || (q.score === best.score && q.score > 0 && q.sc < best.sc - 1e-4 && Math.abs(k-1) < Math.abs(best.k-1) + 0.4)) best = {k, score:q.score, sc:q.sc}; }
+  best.score1 = at1.score; best.sc1 = at1.sc;
+  return best;
+}
+
+function identifyMaterial(a){
+  const list = Object.entries(MATERIALS).map(([k,m]) => ({key:k, name:m.name, a:m.a, rel:(a-m.a)/m.a})).sort((p,q)=>Math.abs(p.rel)-Math.abs(q.rel));
+  const close = list.filter(e => Math.abs(e.rel) < 0.03);
+  const tied = close.filter(e => Math.abs(e.rel) - Math.abs(list[0].rel) < 0.02);
+  return {best:list[0], close, tied, matched: close.length > 0};
+}
+
+function ringStats(r, phi, ring, strength){
+  const m = ring.reduce((a,i)=>a+r[i],0)/ring.length;
+  const sd = Math.sqrt(ring.reduce((a,i)=>a+(r[i]-m)**2,0)/ring.length);
+  const ph = ring.map(i=>phi[i]);
+  const R6 = sixfold(ph);
+  const tg = ring.length >= 4 ? twoGroups(ph) : null;
+  const two = !!(tg && Math.min(...tg.counts) >= 2 && tg.theta > Math.max(2.0, 5*tg.sd));
+  const S = ring.reduce((a,i)=>a+strength[i],0);
+  return {ids:ring, r:m, rel:sd/m, R6, two, tg, S, n:ring.length};
+}
+
+// ---- measure from a real-space image (Fourier transform -> computed diffraction pattern)
+function analyseRealSpace({lum, N, sApx=null, hint='auto'}){
+  let mean = 0; for(let i=0; i<N*N; i++) mean += lum[i]; mean /= N*N;
+  const re = new Float64Array(N*N), im = new Float64Array(N*N);
+  for(let y=0; y<N; y++){ const wy = 0.5-0.5*Math.cos(2*Math.PI*y/(N-1));
+    for(let x=0; x<N; x++){ const wx = 0.5-0.5*Math.cos(2*Math.PI*x/(N-1)); re[y*N+x] = (lum[y*N+x]-mean)*wx*wy; } }
+  fft2(re, im, N);
+  const L = new Float32Array(N*N);
+  for(let y=0; y<N; y++) for(let x=0; x<N; x++){ const sx = (x+N/2)%N, sy = (y+N/2)%N; L[y*N+x] = Math.log(1 + re[sy*N+sx]**2 + im[sy*N+sx]**2); }
+  const B = gaussBlur(L, N, 4); const C = new Float32Array(N*N); for(let i=0; i<N*N; i++) C[i] = L[i]-B[i];
+  const vals = []; for(let y=0; y<N; y+=2) for(let x=0; x<N; x+=2){ const r = Math.hypot(x-N/2, y-N/2); if(r > 6 && r < N/2-4) vals.push(C[y*N+x]); }
+  const {med, mad} = robustStats(vals);
+  const pk = findMaxima(C, N, {win:3, thr:med+Math.max(3*mad, 4), border:4, rmin:6, rmax:N/2-4, maxN:70});
+  const res = {mode:'real', fft:L, peaks:pk, notes:[]};
+  if(pk.length < 4){ res.ok = false; res.message = "No periodic pattern found. The image may be too noisy or not show a lattice."; return res; }
+  const dx = pk.map(p=>p.x-N/2), dy = pk.map(p=>-(p.y-N/2)), r = dx.map((x,i)=>Math.hypot(x,dy[i])), phi = dx.map((x,i)=>Math.atan2(dy[i],x));
+  const strength = pk.map(p=>p.v);
+  const rings = splitRings(r, r.map((_,i)=>i), 0.03, 1.5).filter(g=>g.length>=4).map(g=>ringStats(r,phi,g,strength));
+  const aOf = rr => sApx ? 2*(N*sApx/rr)/Math.sqrt(3) : null;
+  rings.forEach(g => g.a = aOf(g.r));
+  const atomicOK = g => !sApx || (g.a > 2.0 && g.a < 3.9 && identifyMaterial(g.a).matched);
+  const moireFirst = rings.filter(g => !g.two && g.R6 >= 0.9 && (!sApx || g.a > 4.5)).sort((p,q)=>p.r-q.r)[0] || null;
+  const agrees = g => { if(!moireFirst || moireFirst.r >= 0.7*g.r) return true;
+    const pred = 2*g.r*Math.sin(g.tg.theta*DEG/2); return Math.abs(pred - moireFirst.r)/moireFirst.r < 0.12; };
+  const twoRings = rings.filter(g => g.two && atomicOK(g)).sort((p,q)=>q.S-p.S);
+  const atom = twoRings.find(agrees) || null;
+  if(!atom && twoRings.length) res.notes.push("Spots at several angles were found, but they do not match the moiré spacing, so they were treated as moiré harmonics.");
+  const singleAtom = !atom ? rings.filter(g => !g.two && g.R6 >= 0.9 && sApx && g.a > 2.0 && g.a < 3.9).sort((p,q)=>q.S-p.S)[0] || null : null;
+  const refR = atom ? atom.r : singleAtom ? singleAtom.r : null;
+  const moire = refR ? (rings.filter(g => !g.two && g.R6 >= 0.9 && g.r < 0.7*refR).sort((p,q)=>p.r-q.r)[0] || null) : moireFirst;
+  res.rings = rings; res.atom = atom; res.singleAtom = singleAtom; res.moire = moire;
+  if(atom){ res.theta = atom.tg.theta; res.se = atom.tg.se; res.method = "angle between the two atomic lattices"; }
+  if(moire){
+    let thM = null, how = null, aUse = null;
+    if(refR){ const x = moire.r/(2*refR); if(x <= 1){ thM = 2*Math.asin(x)/DEG; how = "moiré spacing ÷ lattice spacing"; } }
+    else if(sApx){ aUse = hint !== 'auto' ? MATERIALS[hint].a : null;
+      const lam = 2*(N*sApx/moire.r)/Math.sqrt(3); res.lambda = lam;
+      if(aUse){ const x = aUse/(2*lam); if(x <= 1){ thM = 2*Math.asin(x)/DEG; how = "moiré period with the chosen material"; } }
+      else res.notes.push("Only the moiré is visible. Choose the material to turn the moiré period into a twist angle."); }
+    else res.notes.push("Only the moiré is visible. Enter the image width and choose the material to get the twist angle.");
+    if(sApx && res.lambda === undefined) res.lambda = 2*(N*sApx/moire.r)/Math.sqrt(3);
+    res.thetaMoire = thM; res.moireHow = how;
+    if(!atom && thM !== null){ res.theta = thM; res.se = null; res.method = how; }
+  }
+  const latt = atom || singleAtom;
+  if(latt && sApx){ res.a = latt.a; res.material = identifyMaterial(latt.a); }
+  else if(latt && !sApx) res.notes.push("Enter the image width to identify the material from the lattice spacing.");
+  res.ok = res.theta !== undefined && res.theta !== null;
+  if(!res.ok && !res.message){ const ask = res.notes.find(n => n.startsWith("Only the moiré")); res.message = ask || (res.notes.length ? res.notes[0] : "Found periodic spots but could not separate two lattices or a moiré."); }
+  return res;
+}
+
+// ---- measure from a diffraction pattern (same steps as the Python extractor)
+function analyseDiffraction({lum, colour, N, cal=null, stretch=true}){
+  const Lm = Float32Array.from(lum);
+  const med0 = median(Lm);
+  const inverted = med0 > 128; if(inverted) for(let i=0; i<N*N; i++) Lm[i] = 255-Lm[i];
+  const med1 = median(Lm);
+  if(colour){ const cm = gaussBlur(Float32Array.from(colour), N, 2), Wt = new Float32Array(N*N), LW = new Float32Array(N*N);
+    for(let i=0; i<N*N; i++){ Wt[i] = cm[i] > 0.04 ? 0 : 1; LW[i] = Lm[i]*Wt[i]; }
+    const num = gaussBlur(LW, N, 6), den = gaussBlur(Wt, N, 6);
+    for(let i=0; i<N*N; i++) if(!Wt[i]) Lm[i] = den[i] > 1e-3 ? num[i]/den[i] : med1; }
+  // beam stop: dark region covering the centre
+  const stop = new Uint8Array(N*N);
+  const c0 = (N>>1)*N + (N>>1);
+  if(!inverted && Lm[c0] < 15){ const q = [c0]; stop[c0] = 1;
+    while(q.length){ const p = q.pop(), x = p % N, y = (p/N)|0;
+      for(const [ddx,ddy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const xx = x+ddx, yy = y+ddy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const t = yy*N+xx; if(!stop[t] && Lm[t] < 15 && Math.hypot(xx-N/2, yy-N/2) < 0.42*N){ stop[t] = 1; q.push(t); } } }
+    let area = 0; for(let i=0; i<N*N; i++) area += stop[i];
+    if(area > 0.25*N*N) stop.fill(0); }   // that was dark background, not a beam stop
+  const grown = gaussBlur(Float32Array.from(stop), N, 4); const ex = new Uint8Array(N*N); for(let i=0; i<N*N; i++) ex[i] = grown[i] > 0.02 ? 1 : 0;
+  const a1 = gaussBlur(Lm, N, 1.2), a2 = gaussBlur(Lm, N, 4.5), D = new Float32Array(N*N);
+  for(let i=0; i<N*N; i++) D[i] = a1[i]-a2[i];
+  const vals = []; for(let i=0; i<N*N; i+=3) if(!ex[i]) vals.push(D[i]);
+  const {med, mad} = robustStats(vals);
+  let pk = findMaxima(D, N, {win:3, thr:med+6*mad, border:6, exclude:ex, maxN:60});
+  const res = {mode:'diff', notes:[], peaks:pk};
+  if(pk.length){ const vs = pk.map(p=>p.v).sort((a,b)=>a-b); const p90 = vs[Math.floor(0.9*(vs.length-1))]; pk = pk.filter(p=>p.v > 0.25*p90); res.peaks = pk; }
+  if(pk.length < 6){ res.ok = false; res.message = "Too few diffraction spots were found."; return res; }
+  let {cx, cy, count} = pickCentre(pk, N);
+  if(!(count >= 2)){ cx = N/2; cy = N/2; res.notes.push("Could not find the pattern centre from opposite spot pairs; used the image centre."); }
+  let dx = pk.map(p=>p.x-cx), dy = pk.map(p=>-(p.y-cy));
+  let k = 1;
+  if(stretch){ const f = fitStretch(dx, dy); if(f.score > f.score1 || (f.score === f.score1 && f.score > 0 && f.sc < 0.5*f.sc1 && f.sc1 > 0.01)){ k = f.k; dx = dx.map(x=>x/k); } }
+  const r = dx.map((x,i)=>Math.hypot(x,dy[i])), phi = dx.map((x,i)=>Math.atan2(dy[i],x)), strength = pk.map(p=>p.v);
+  const keep = r.map((_,i)=>i).filter(i=>r[i] > 15);
+  const rings = splitRings(r, keep, 0.10).filter(g=>g.length>=5).map(g=>ringStats(r,phi,g,strength));
+  res.cx = cx; res.cy = cy; res.k = k; res.rings = rings;
+  if(!rings.length){ res.ok = false; res.message = "No ring of five or more spots at one distance from the centre."; return res; }
+  // prefer a tight ring that holds two rotated hexagons; otherwise the tightest ring
+  const twoTight = rings.filter(g => g.two && g.rel < 0.03).sort((p,q)=>p.rel-q.rel);
+  const best = twoTight[0] || rings.slice().sort((p,q)=>p.rel-q.rel)[0];
+  res.atom = best.two ? best : null;
+  if(best.two){ res.theta = best.tg.theta; res.se = best.tg.se; res.method = "angle between the two spot hexagons"; }
+  else { res.single = true; res.theta = 0; res.se = null; res.method = "one hexagon of spots"; res.notes.push("All spots share one orientation within 2°: a single layer, or a twist too small to resolve from spot directions."); res.singleRing = best; }
+  if(cal){ const inner = rings.slice().sort((p,q)=>p.r-q.r)[0]; const kNm = inner.r*cal; const dNm = 1/kNm; res.a = 2*dNm*10/Math.sqrt(3); res.material = identifyMaterial(res.a); res.notes.push("Material assumes the innermost ring is the first-order ring."); }
+  else res.notes.push("Add the camera scale to identify the material from the ring size.");
+  if(Math.abs(k-1) > 0.02) res.notes.push(`Image was stretched horizontally by ${((k-1)*100).toFixed(0)}%; corrected before measuring.`);
+  res.ok = true;
+  return res;
+}
+// ==CORE END==
+
+/* ---------------- page code ---------------- */
+const $ = id => document.getElementById(id);
+const N = 512;
+const MARK = {1:'#4d9bff', 2:'#ff8a3d', m:'#ff5a5a', other:'rgba(255,255,255,.35)'};
+
+for(const sel of [$('m1'), $('m2')]) for(const [k,m] of Object.entries(MATERIALS)){ const o = document.createElement('option'); o.value = k; o.textContent = `${m.name}  (a = ${m.a.toFixed(2)} Å)`; sel.appendChild(o); }
+$('hint').innerHTML = '<option value="auto">Identify from lattice</option>' + Object.entries(MATERIALS).map(([k,m])=>`<option value="${k}">${m.name}</option>`).join('');
+$('m1').value = 'graphene'; $('m2').value = 'graphene';
+
+function drawGray(cv, img, cmap){
+  const ctx = cv.getContext('2d'), id = ctx.createImageData(N, N);
+  for(let i=0; i<N*N; i++){ const v = img[i]; let r, g, b;
+    if(cmap){ [r,g,b] = cmap(v); } else { r = g = b = Math.round(255*v); }
+    id.data[4*i] = r; id.data[4*i+1] = g; id.data[4*i+2] = b; id.data[4*i+3] = 255; }
+  ctx.putImageData(id, 0, 0);
+}
+const STOPS = [[0,[10,12,26]],[0.35,[64,38,92]],[0.68,[204,108,58]],[1,[255,238,206]]];
+function warm(v){ for(let i=1; i<STOPS.length; i++) if(v <= STOPS[i][0]){ const [t0,c0] = STOPS[i-1], [t1,c1] = STOPS[i], f = (v-t0)/(t1-t0); return c0.map((c,j)=>Math.round(c+(c1[j]-c)*f)); } return STOPS[STOPS.length-1][1]; }
+function ring(ctx, x, y, rad, col, w=2){ ctx.beginPath(); ctx.arc(x, y, rad, 0, 2*Math.PI); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); }
+function niceBar(W){ const c = [2,5,10,20,50,100,200]; return c.reduce((a,b)=>Math.abs(b-W/5) < Math.abs(a-W/5) ? b : a); }
+const fmt = (v, d=2) => (v === null || v === undefined || !isFinite(v)) ? '—' : v.toFixed(d);
+
+/* ---- simulate tab ---- */
+let lastSim = null;
+function runSim(){
+  const k1 = $('m1').value, k2 = $('m2').value, th = +$('th').value, al = +$('al').value, sg = +$('sg').value, dyn = +$('dy').value;
+  $('alv').textContent = al.toFixed(2); $('sgv').textContent = sg + ' px'; $('dyv').textContent = '10' + String(dyn).replace(/\d/g, d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]).replace('.5','·⁵');
+  const g1 = Gfirst(k1), g2 = Gfirst(k2), qmax = 2.1*Math.max(g1, g2);
+  const spots = simulate(k1, k2, th, al, qmax);
+  const {img, sc} = renderDiffraction(spots, N, qmax, sg, dyn);
+  drawGray($('cDiff'), img);
+  const o = $('oDiff').getContext('2d'); o.clearRect(0,0,N,N);
+  let nM = 0, Ifirst = 0, Imoire = 0;
+  for(const s of spots){ if(s.layer===1 && s.q < 1.05*g1) Ifirst = Math.max(Ifirst, s.I); if(s.layer===3 && s.q < 0.75*Math.min(g1,g2)){ nM++; Imoire = Math.max(Imoire, s.I); } }
+  if($('mk').checked){
+    for(const s of spots){ const x = N/2 + s.x*sc, y = N/2 - s.y*sc;
+      if((s.layer===1 || s.layer===12) && s.q < 1.05*g1) ring(o, x, y, 10, MARK[1]);
+      if((s.layer===2 || s.layer===12) && s.q < 1.05*g2) ring(o, x, y, s.layer===12 ? 14 : 10, MARK[2]);
+      if(s.layer===3 && s.q < 0.75*Math.min(g1,g2)) ring(o, x, y, 8, MARK.m); } }
+  $('diffScale').textContent = `Edge of the screen: |q| = ${qmax.toFixed(2)} Å⁻¹ (2π convention). Centre beam saturated.`;
+  const lam = moirePeriod(k1, k2, th);
+  const W = isFinite(lam) ? Math.min(400, Math.max(40, 4*lam)) : 60;
+  drawGray($('cReal'), renderRealSpace(k1, k2, th, N, W), warm);
+  const rc = $('cReal').getContext('2d'), bar = niceBar(W), px = bar/W*N;
+  rc.fillStyle = 'rgba(0,0,0,.55)'; rc.fillRect(14, N-44, px+20, 32);
+  rc.fillStyle = '#ffffff'; rc.fillRect(24, N-24, px, 5); rc.font = '600 15px IBM Plex Sans, sans-serif'; rc.fillText(bar + ' Å', 24, N-30);
+  $('realScale').textContent = `Field of view ${W.toFixed(0)} Å across.`;
+  const gm = isFinite(lam) ? 4*Math.PI/(Math.sqrt(3)*lam) : 0;
+  const mismatch = (MATERIALS[k2].a/MATERIALS[k1].a - 1)*100;
+  $('simOut').innerHTML = [
+    ['Twist angle', th.toFixed(1) + '°'],
+    ['Moiré period', isFinite(lam) ? lam.toFixed(1) + ' Å' : 'none (aligned)'],
+    ['Moiré spot distance', isFinite(lam) ? gm.toFixed(3) + ' Å⁻¹' : '—'],
+    ['First-order spots', `${g1.toFixed(3)} / ${g2.toFixed(3)} Å⁻¹`],
+    ['Lattice mismatch', mismatch.toFixed(2) + ' %'],
+    ['Moiré ÷ first-order brightness', nM && Ifirst ? (Imoire/Ifirst).toExponential(1) : (al > 0 ? 'off-screen' : 'α = 0: none')]
+  ].map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  lastSim = {k1, k2, th, al, sg, dyn, qmax, img, W};
+}
+['m1','m2','al','sg','dy','mk'].forEach(id => $(id).addEventListener('input', runSim));
+$('th').addEventListener('input', () => { $('thn').value = $('th').value; runSim(); });
+$('thn').addEventListener('input', () => { const v = Math.max(0, Math.min(60, +$('thn').value || 0)); $('th').value = v; runSim(); });
+
+/* ---- tabs ---- */
+function showTab(which){
+  const sim = which === 'sim';
+  $('tabSim').setAttribute('aria-selected', sim); $('tabMeas').setAttribute('aria-selected', !sim);
+  $('pSim').hidden = !sim; $('pMeas').hidden = sim;
+}
+$('tabSim').addEventListener('click', () => showTab('sim'));
+$('tabMeas').addEventListener('click', () => showTab('meas'));
+
+/* ---- measure tab ---- */
+let input = null;   // {lum, colour, scaleNote, origW, S}
+function setType(t){ $(t === 'real' ? 'tReal' : 'tDiff').checked = true; updateTypeUI(); }
+function updateTypeUI(){ const real = $('tReal').checked; $('wrapW').hidden = !real; $('wrapC').hidden = real; $('wrapS').hidden = real; $('figFft').hidden = !real; }
+$('tReal').addEventListener('change', () => { updateTypeUI(); measure(); });
+$('tDiff').addEventListener('change', () => { updateTypeUI(); measure(); });
+
+function loadFromCanvasSource(src, w, h){
+  const S = Math.min(w, h), sx = (w-S)/2, sy = (h-S)/2;
+  const cv = $('cIn'), ctx = cv.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0,0,N,N);
+  ctx.drawImage(src, sx, sy, S, S, 0, 0, N, N);
+  const d = ctx.getImageData(0, 0, N, N).data, lum = new Float32Array(N*N), colour = new Uint8Array(N*N);
+  for(let i=0; i<N*N; i++){ const r = d[4*i], g = d[4*i+1], b = d[4*i+2];
+    lum[i] = 0.299*r + 0.587*g + 0.114*b; colour[i] = (Math.max(r,g,b) - Math.min(r,g,b)) > 35 ? 1 : 0; }
+  input = {lum, colour, origW:w, S};
+  $('inNote').textContent = S === N && w === N ? '512 × 512' : `Centre ${S} × ${S} px of ${w} × ${h}, resampled to 512 × 512`;
+}
+
+$('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if(f) readFile(f); });
+const drop = $('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if(f) readFile(f); });
+function readFile(f){
+  if(!f.type.startsWith('image/')){ showError("That file is not an image. Upload a PNG or JPG."); return; }
+  const url = URL.createObjectURL(f), im = new Image();
+  im.onload = () => { $('wnm').value = ''; $('cal').value = ''; $('st').checked = true; loadFromCanvasSource(im, im.naturalWidth, im.naturalHeight); URL.revokeObjectURL(url); measure(); };
+  im.onerror = () => showError("The image could not be read. Try a PNG or JPG.");
+  im.src = url;
+}
+function showError(msg){ $('res').innerHTML = `<p class="pill warn">Not measured</p><p>${msg}</p>`; }
+
+function noisyCanvas(img, noise, cmap){
+  const cv = document.createElement('canvas'); cv.width = N; cv.height = N; const ctx = cv.getContext('2d'), id = ctx.createImageData(N, N);
+  let seed = 12345; const rnd = () => { seed = (seed*1103515245 + 12345) & 0x7fffffff; return seed/0x7fffffff; };
+  for(let i=0; i<N*N; i++){ const g = Math.sqrt(-2*Math.log(rnd()+1e-12))*Math.cos(2*Math.PI*rnd());
+    const v = Math.max(0, Math.min(1, img[i] + noise*g)); const c = cmap ? cmap(v) : [255*v,255*v,255*v];
+    id.data[4*i] = c[0]; id.data[4*i+1] = c[1]; id.data[4*i+2] = c[2]; id.data[4*i+3] = 255; }
+  ctx.putImageData(id, 0, 0); return cv;
+}
+function exampleReal(k='graphene', th=8){
+  const W = 215, img = renderRealSpace(k, k, th, N, W);
+  loadFromCanvasSource(noisyCanvas(img, 0.08), N, N);
+  $('wnm').value = (W/10).toFixed(2); $('hint').value = 'auto'; setType('real'); measure(`Example: generated STM-like image of ${MATERIALS[k].name} twisted by ${th}° (noise added). True answer: ${th}°, ${MATERIALS[k].name}.`);
+}
+function exampleDiff(k='MoS2', th=16, al=0.25){
+  const qmax = 2.1*Gfirst(k), {img} = renderDiffraction(simulate(k, k, th, al, qmax), N, qmax, 2.2, 4.5);
+  loadFromCanvasSource(noisyCanvas(img, 0.04), N, N);
+  $('cal').value = (qmax/(N/2)/(2*Math.PI)*10).toPrecision(4); setType('diff'); $('st').checked = false;
+  measure(`Example: generated diffraction pattern of ${MATERIALS[k].name} twisted by ${th}° (noise added). True answer: ${th}°, ${MATERIALS[k].name}.`);
+}
+$('exR').addEventListener('click', () => exampleReal());
+$('exD').addEventListener('click', () => exampleDiff());
+$('sendDiff').addEventListener('click', () => { const s = lastSim; const {img} = renderDiffraction(simulate(s.k1, s.k2, s.th, s.al, s.qmax), N, s.qmax, s.sg, s.dyn);
+  loadFromCanvasSource(noisyCanvas(img, 0.03), N, N); $('cal').value = (s.qmax/(N/2)/(2*Math.PI)*10).toPrecision(4); $('st').checked = false; setType('diff'); showTab('meas');
+  measure(`From the simulator: ${MATERIALS[s.k1].name} / ${MATERIALS[s.k2].name}, ${s.th}° (noise added).`); });
+$('sendReal').addEventListener('click', () => { const s = lastSim; const W = Math.min(215, s.W); const img = renderRealSpace(s.k1, s.k2, s.th, N, W);
+  loadFromCanvasSource(noisyCanvas(img, 0.06), N, N); $('wnm').value = (W/10).toFixed(2); setType('real'); showTab('meas');
+  measure(`From the simulator: ${MATERIALS[s.k1].name} / ${MATERIALS[s.k2].name}, ${s.th}° (noise added).`); });
+$('run').addEventListener('click', () => measure());
+
+function measure(sourceNote){
+  if(!input){ showError("Upload an image or load an example first."); return; }
+  const real = $('tReal').checked;
+  // redraw the clean input before overlays
+  const o = $('oIn').getContext('2d'); o.clearRect(0,0,N,N);
+  let r;
+  if(real){
+    const wnm = parseFloat($('wnm').value); const sApx = wnm > 0 ? (wnm*10/input.origW)*input.S/N : null;
+    r = analyseRealSpace({lum:input.lum, N, sApx, hint:$('hint').value});
+    const L = r.fft; let mx = 0, mn = Infinity; for(const v of L){ if(v>mx) mx=v; if(v<mn) mn=v; }
+    const disp = new Float32Array(N*N); for(let i=0; i<N*N; i++) disp[i] = Math.pow((L[i]-mn)/(mx-mn), 1.6);
+    drawGray($('cFft'), disp);
+    const of = $('oFft').getContext('2d'); of.clearRect(0,0,N,N);
+    if(r.peaks) for(const p of r.peaks) ring(of, p.x, p.y, 5, MARK.other, 1);
+    if(r.atom) r.atom.ids.forEach((id,j) => { const p = r.peaks[id]; ring(of, p.x, p.y, 9, r.atom.tg.labels[j] ? MARK[2] : MARK[1]); });
+    if(r.singleAtom) r.singleAtom.ids.forEach(id => { const p = r.peaks[id]; ring(of, p.x, p.y, 9, MARK[1]); });
+    if(r.moire) r.moire.ids.forEach(id => { const p = r.peaks[id]; ring(of, p.x, p.y, 9, MARK.m); });
+  } else {
+    const calOrig = parseFloat($('cal').value); const cal = calOrig > 0 ? calOrig*input.S/N : null;
+    r = analyseDiffraction({lum:input.lum, colour:input.colour, N, cal, stretch:$('st').checked});
+    if(r.peaks) for(const p of r.peaks) ring(o, p.x, p.y, 5, MARK.other, 1);
+    const g = r.atom || r.singleRing;
+    if(g) g.ids.forEach((id,j) => { const p = r.peaks[id]; ring(o, p.x, p.y, 10, r.atom && r.atom.tg.labels[j] ? MARK[2] : MARK[1]); });
+    if(isFinite(r.cx)){ o.strokeStyle = MARK.m; o.lineWidth = 2; o.beginPath(); o.moveTo(r.cx-8, r.cy); o.lineTo(r.cx+8, r.cy); o.moveTo(r.cx, r.cy-8); o.lineTo(r.cx, r.cy+8); o.stroke(); }
+  }
+  renderResult(r, sourceNote);
+}
+
+function renderResult(r, sourceNote){
+  const notes = (r.notes || []).slice();
+  if(sourceNote) notes.unshift(sourceNote);
+  if(!r.ok){ $('res').innerHTML = `<span class="pill warn">Not measured</span><p style="margin:0">${r.message}</p>` + (notes.length ? `<ul class="notes">${notes.map(n=>`<li>${n}</li>`).join('')}</ul>` : ''); return; }
+  let mat = 'Needs a scale';
+  if(r.material){ const m = r.material; mat = m.matched ? (m.tied.length > 1 ? m.tied.map(e=>e.name).join(' or ') : m.best.name) : 'No match within 3%'; }
+  const rows = [];
+  rows.push(['Method', r.method]);
+  if(r.a) rows.push(['Measured lattice constant', r.a.toFixed(3) + ' Å']);
+  if(r.material && r.material.matched) rows.push(['Closest match', `${r.material.best.name}, a = ${r.material.best.a.toFixed(2)} Å (${(r.material.best.rel*100).toFixed(1)}% off)`]);
+  if(r.mode === 'real' && r.lambda) rows.push(['Moiré period', r.lambda.toFixed(1) + ' Å']);
+  if(r.mode === 'real' && r.thetaMoire && r.atom) rows.push(['Cross-check from moiré spacing', r.thetaMoire.toFixed(2) + '°']);
+  if(r.mode === 'diff') rows.push(['Spots used', (r.atom || r.singleRing).n + ' of ' + r.peaks.length + ' detected']);
+  const single = r.single;
+  const head = single ? '<span class="num">1 layer</span>' : `<span class="num">${r.theta.toFixed(2)}°</span>${r.se ? `<span class="unc">± ${r.se.toFixed(2)}° (spot scatter)</span>` : ''}`;
+  const conf = single ? '<span class="pill warn">No twist detected</span>' : (r.se !== null && r.se < 0.5 ? '<span class="pill good">Clean measurement</span>' : '<span class="pill warn">Check by eye</span>');
+  $('res').innerHTML = `<div class="big">${head}<span><span class="lbl">Material</span><br><b>${mat}</b></span>${conf}</div>
+    <dl class="readouts">${rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+    ${notes.length ? `<ul class="notes">${notes.map(n=>`<li>${n}</li>`).join('')}</ul>` : ''}`;
+}
+
+updateTypeUI();
+runSim();
+exampleDiff();
+</script>

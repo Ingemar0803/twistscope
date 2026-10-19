@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+python/results/
+python/results_moire/
+python/real_data/*.png
+.DS_Store
